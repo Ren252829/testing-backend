@@ -15,23 +15,26 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv('GOOGLE_APPLICATION_CRE
 app = Flask(__name__)
 
 # Konfigurasi
-BUCKET_NAME = 'test-bucket-herbmate'
-MODEL_FILENAME = 'models/model.h5'
+BUCKET_NAME = 'test-deploy-herbmate'
+MODEL_FILENAME = 'model.h5'
 
-# Fungsi untuk mengunduh model
+# Fungsi untuk mengunduh model dari GCS jika tidak ada di lokal
 def download_model_from_gcs():
+    local_model_path = f'./{os.path.basename(MODEL_FILENAME)}'
+
+    # Cek apakah model sudah ada di lokal
+    if os.path.exists(local_model_path):
+        print("Model sudah tersedia di lokal.")
+        return local_model_path
+
     try:
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
         blob = bucket.blob(MODEL_FILENAME)
-        local_model_path = f'./{os.path.basename(MODEL_FILENAME)}'
 
-        if not os.path.exists(local_model_path):
-            print("Mengunduh model dari Cloud Storage...")
-            blob.download_to_filename(local_model_path)
-            print("Model berhasil diunduh.")
-        else:
-            print("Model sudah tersedia di lokal.")
+        print("Mengunduh model dari Cloud Storage...")
+        blob.download_to_filename(local_model_path)
+        print("Model berhasil diunduh.")
 
         return local_model_path
     except NotFound:
@@ -49,6 +52,8 @@ try:
 except Exception as e:
     print(f"Gagal memuat model: {e}")
     model = None
+
+print(model)
 
 @app.route('/')
 def home():
@@ -83,4 +88,4 @@ def predict():
         return jsonify({'error': f'Terjadi kesalahan saat memproses prediksi: {e}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8080)
