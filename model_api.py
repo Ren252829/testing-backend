@@ -6,37 +6,37 @@ import io
 from google.cloud import storage
 import os
 from dotenv import load_dotenv
-from google.api_core.exceptions import NotFound  # Perbaikan import
+from google.api_core.exceptions import NotFound
 
 # Memuat variabel dari .env
 load_dotenv()
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv('GOOGLE_APPLICATION_CREDENTIALS') #kredensial untuk akses ke google storage dimana model di simpan
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 
 app = Flask(__name__)
 
 # Konfigurasi
-BUCKET_NAME = 'test-deploy-herbmate'
-MODEL_FILENAME = 'model.h5'
+BUCKET_NAME = 'herbmate-models'
+MODEL_FILENAME = 'Models/model.h5'  # Path di GCS
+LOCAL_MODEL_PATH = './model.h5'  # Path model lokal
 
 # Fungsi untuk mengunduh model dari GCS jika tidak ada di lokal
 def download_model_from_gcs():
-    local_model_path = f'./{os.path.basename(MODEL_FILENAME)}'
-
     # Cek apakah model sudah ada di lokal
-    if os.path.exists(local_model_path):
+    if os.path.exists(LOCAL_MODEL_PATH):
         print("Model sudah tersedia di lokal.")
-        return local_model_path
+        return LOCAL_MODEL_PATH
 
     try:
+        # Mengunduh model dari Cloud Storage
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
         blob = bucket.blob(MODEL_FILENAME)
 
         print("Mengunduh model dari Cloud Storage...")
-        blob.download_to_filename(local_model_path)
+        blob.download_to_filename(LOCAL_MODEL_PATH)
         print("Model berhasil diunduh.")
 
-        return local_model_path
+        return LOCAL_MODEL_PATH
     except NotFound:
         print(f"Error: Model file '{MODEL_FILENAME}' tidak ditemukan di bucket '{BUCKET_NAME}'.")
         raise
@@ -44,16 +44,15 @@ def download_model_from_gcs():
         print(f"Terjadi kesalahan saat mengunduh model: {e}")
         raise
 
-# Unduh model dan muat ke memori
+# Unduh model atau gunakan model lokal
 try:
-    model_path = download_model_from_gcs()
+    model_path = download_model_from_gcs()  # Cek lokal dulu, baru download jika tidak ada
     model = load_model(model_path)
     print("Model berhasil dimuat ke memori.")
 except Exception as e:
     print(f"Gagal memuat model: {e}")
     model = None
 
-print(model)
 
 @app.route('/')
 def home():
